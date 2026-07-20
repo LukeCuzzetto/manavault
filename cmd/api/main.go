@@ -12,17 +12,22 @@ type healthResponse struct {
 
 func main() {
 
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/health", healthHandler)
+	router := newRouter()
 
 	address := ":8080"
 
 	log.Printf("ManaVault API listening on %s", address)
 
-	if err := http.ListenAndServe(address, mux); err != nil {
+	if err := http.ListenAndServe(address, router); err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
+}
+
+func newRouter() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", healthHandler)
+
+	return mux
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {

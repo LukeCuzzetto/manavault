@@ -11,7 +11,8 @@ func TestHealtHandler(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)
 	recorder := httptest.NewRecorder()
 
-	healthHandler(recorder, request)
+	router := newRouter()
+	router.ServeHTTP(recorder, request)
 
 	response := recorder.Result()
 	defer response.Body.Close()
@@ -47,7 +48,9 @@ func TestHealthHanderRejectsUnsupportedMethods(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/health", nil)
 	recorder := httptest.NewRecorder()
 
-	healthHandler(recorder, request)
+	router := newRouter()
+
+	router.ServeHTTP(recorder, request)
 
 	response := recorder.Result()
 	defer response.Body.Close()
