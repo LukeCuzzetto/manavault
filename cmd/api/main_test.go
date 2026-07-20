@@ -73,3 +73,48 @@ func TestHealthHanderRejectsUnsupportedMethods(t *testing.T) {
 		)
 	}
 }
+
+func TestRouterReturnsJSONNotFound(t *testing.T) {
+
+	router := newRouter()
+
+	request := httptest.NewRequest(http.MethodGet, "/does-not-exist", nil)
+	recorder := httptest.NewRecorder()
+
+	router.ServeHTTP(recorder, request)
+
+	response := recorder.Result()
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusNotFound,
+			response.StatusCode,
+		)
+	}
+
+	contentType := response.Header.Get("Content-Type")
+	if contentType != "application/json" {
+		t.Fatalf(
+			"expected Content-Type application/json, got %q",
+			contentType,
+		)
+	}
+
+	var body struct {
+		Error string `json:"error"`
+	}
+
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode response body: %v", err)
+	}
+
+	if body.Error != "route not found" {
+		t.Errorf(
+			"expected error %q, got %q",
+			"route not found",
+			body.Error,
+		)
+	}
+}
