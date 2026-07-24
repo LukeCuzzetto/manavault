@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ func TestHealtHandler(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)
 	recorder := httptest.NewRecorder()
 
-	router := newRouter()
+	router := NewRouter()
 	router.ServeHTTP(recorder, request)
 
 	response := recorder.Result()
@@ -48,7 +48,7 @@ func TestHealthHanderRejectsUnsupportedMethods(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/health", nil)
 	recorder := httptest.NewRecorder()
 
-	router := newRouter()
+	router := NewRouter()
 
 	router.ServeHTTP(recorder, request)
 
@@ -76,7 +76,7 @@ func TestHealthHanderRejectsUnsupportedMethods(t *testing.T) {
 
 func TestRouterReturnsJSONNotFound(t *testing.T) {
 
-	router := newRouter()
+	router := NewRouter()
 
 	request := httptest.NewRequest(http.MethodGet, "/does-not-exist", nil)
 	recorder := httptest.NewRecorder()
