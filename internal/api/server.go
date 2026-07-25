@@ -14,13 +14,25 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
-func NewRouter() *http.ServeMux {
+func NewRouter(logger *log.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/", notFoundHandler)
 
-	return mux
+	return requestLogger(logger, mux)
+}
+
+func requestLogger(logger *log.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger.Printf(
+			"request method=%s path%s",
+			r.Method,
+			r.URL.Path,
+		)
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
