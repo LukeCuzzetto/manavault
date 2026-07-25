@@ -5,16 +5,16 @@ import (
 	"net/http"
 
 	"github.com/LukeCuzzetto/manavault/internal/api"
+	"github.com/LukeCuzzetto/manavault/internal/config"
 )
 
 func main() {
+	cfg := config.Load()
 	router := api.NewRouter()
 
-	address := ":8080"
+	log.Printf("ManaVault API listening on %s", cfg.Address)
 
-	log.Printf("ManaVault API listening on %s", address)
-
-	if err := http.ListenAndServe(address, router); err != nil {
+	if err := http.ListenAndServe(cfg.Address, router); err != nil {
 		log.Fatalf("error starting server: %v", err)
 	}
 }
