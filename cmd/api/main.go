@@ -9,7 +9,12 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
+	cfg, err := config.Load()
+
+	if err != nil {
+		log.Fatalf("error loading config: %v", err)
+	}
+
 	router := api.NewRouter()
 
 	log.Printf("ManaVault API listening on %s", cfg.Address)
