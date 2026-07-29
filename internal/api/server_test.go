@@ -131,7 +131,7 @@ func TestRouterReturnsJSONNotFound(t *testing.T) {
 	}
 }
 
-func TestRequestLogger(t *testing.T) {
+func TestRequestLoggerLogsCompletedRequest(t *testing.T) {
 
 	var logOutput bytes.Buffer
 
@@ -145,7 +145,7 @@ func TestRequestLogger(t *testing.T) {
 
 	router.ServeHTTP(recorder, request)
 
-	expectedLog := "request method=GET path/health"
+	expectedLog := "request method=GET path=/health status=200 duration="
 
 	if !strings.Contains(logOutput.String(), expectedLog) {
 		t.Errorf(
