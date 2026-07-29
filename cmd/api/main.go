@@ -19,11 +19,12 @@ func main() {
 		log.Fatalf("error loading config: %v", err)
 	}
 
-	router := api.NewRouter(logger)
+	app := api.NewApplication(logger)
+	router := app.Router()
 
-	log.Printf("ManaVault API listening on %s", cfg.Address)
+	logger.Printf("ManaVault API listening on %s", cfg.Address)
 
 	if err := http.ListenAndServe(cfg.Address, router); err != nil {
-		log.Fatalf("error starting server: %v", err)
+		logger.Fatalf("error starting server: %v", err)
 	}
 }

@@ -12,7 +12,9 @@ import (
 func newTestRouter() http.Handler {
 	logger := log.New(io.Discard, "", 0)
 
-	return NewRouter(logger)
+	app := NewApplication(logger)
+
+	return app.Router()
 }
 
 func TestHealtHandler(t *testing.T) {
