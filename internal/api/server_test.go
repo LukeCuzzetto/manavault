@@ -1,11 +1,13 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -125,6 +127,31 @@ func TestRouterReturnsJSONNotFound(t *testing.T) {
 			"expected error %q, got %q",
 			"route not found",
 			body.Error,
+		)
+	}
+}
+
+func TestRequestLogger(t *testing.T) {
+
+	var logOutput bytes.Buffer
+
+	logger := log.New(&logOutput, "", 0)
+
+	app := NewApplication(logger)
+	router := app.Router()
+
+	request := httptest.NewRequest(http.MethodGet, "/health", nil)
+	recorder := httptest.NewRecorder()
+
+	router.ServeHTTP(recorder, request)
+
+	expectedLog := "request method=GET path/health"
+
+	if !strings.Contains(logOutput.String(), expectedLog) {
+		t.Errorf(
+			"expected log output to contain %q, got %q",
+			expectedLog,
+			logOutput.String(),
 		)
 	}
 }
