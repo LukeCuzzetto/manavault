@@ -35,7 +35,7 @@ func (app *Application) Router() http.Handler {
 	mux.HandleFunc("/health", app.healthHandler)
 	mux.HandleFunc("/", app.notFoundHandler)
 
-	return app.requestLogger(mux)
+	return app.requestLogger(app.recoverPanic(mux))
 }
 
 func (app *Application) requestLogger(next http.Handler) http.Handler {
@@ -56,6 +56,32 @@ func (app *Application) requestLogger(next http.Handler) http.Handler {
 			recorder.statusCode,
 			time.Since(start),
 		)
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *Application) recoverPanic(next http.Handler) http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				app.logger.Printf("panic recovered: %v", recovered)
+
+				response := errorResponse{
+					Error: "internal server error",
+				}
+
+				if err := writeJSON(
+					w,
+					http.StatusInternalServerError,
+					response,
+				); err != nil {
+					app.logger.Printf("Error encoding internal server error response: %v", err)
+				}
+			}
+
+		}()
 
 		next.ServeHTTP(w, r)
 	})

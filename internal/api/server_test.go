@@ -155,3 +155,73 @@ func TestRequestLoggerLogsCompletedRequest(t *testing.T) {
 		)
 	}
 }
+
+func TestRecoverPanicReturnsInternalServerError(t *testing.T) {
+	var logOutput bytes.Buffer
+
+	logger := log.New(&logOutput, "", 0)
+
+	app := NewApplication(logger)
+
+	panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("unexpected test failure")
+	},
+	)
+
+	handler := app.requestLogger(
+		app.recoverPanic(panicHandler),
+	)
+
+	request := httptest.NewRequest(http.MethodGet, "/panic-test", nil)
+
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, request)
+
+	response := recorder.Result()
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusInternalServerError {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusInternalServerError,
+			response.StatusCode,
+		)
+	}
+
+	contentType := response.Header.Get("Content-Type")
+	if contentType != "application/json" {
+		t.Errorf(
+			"expected Content-Type application/json, got %q",
+			contentType,
+		)
+	}
+
+	var body errorResponse
+
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode response body: %v", err)
+	}
+
+	if body.Error != "internal server error" {
+		t.Errorf(
+			"expected error %q, got %q",
+			"internal server error",
+			body.Error,
+		)
+	}
+
+	if !strings.Contains(logOutput.String(), "panic recovered: unexpected test failure") {
+		t.Errorf(
+			"expected log output to contain panic recovery message, got %q",
+			logOutput.String(),
+		)
+	}
+
+	if !strings.Contains(logOutput.String(), "status=500") {
+		t.Errorf(
+			"expected log output to contain status=500, got %q",
+			logOutput.String(),
+		)
+	}
+}
