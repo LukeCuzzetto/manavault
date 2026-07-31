@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/LukeCuzzetto/manavault/internal/api"
@@ -15,6 +19,7 @@ const (
 	serverReadTimeout       = 10 * time.Second
 	serverWriteTimeout      = 30 * time.Second
 	serverIdleTimeout       = 60 * time.Second
+	serverShutdownTimeout   = 10 * time.Second
 )
 
 func newHTTPServer(
@@ -46,9 +51,42 @@ func main() {
 
 	server := newHTTPServer(cfg.Address, router)
 
-	logger.Printf("ManaVault API listening on %s", cfg.Address)
+	shutdownSignal, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+	defer stop()
 
-	if err := server.ListenAndServe(); err != nil {
-		logger.Fatalf("error running server: %v", err)
+	serverErrors := make(chan error, 1)
+
+	go func() {
+		serverErrors <- server.ListenAndServe()
+	}()
+
+	logger.Printf("server is listening on %s", cfg.Address)
+
+	select {
+	case err := <-serverErrors:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Fatalf("error running server: %v", err)
+		}
+
+		return
+
+	case <-shutdownSignal.Done():
+		logger.Println("shutdown signal received, shutting down server...")
+	}
+
+	shutdownContext, cancel := context.WithTimeout(
+		context.Background(),
+		serverShutdownTimeout,
+	)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownContext); err != nil {
+		logger.Printf("graceful shut down failed: %v", err)
+	} else {
+		logger.Println("ManaVault API Stopped")
 	}
 }
