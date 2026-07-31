@@ -56,13 +56,10 @@ func (app *Application) requestLogger(next http.Handler) http.Handler {
 			recorder.statusCode,
 			time.Since(start),
 		)
-
-		next.ServeHTTP(w, r)
 	})
 }
 
 func (app *Application) recoverPanic(next http.Handler) http.Handler {
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
@@ -77,10 +74,12 @@ func (app *Application) recoverPanic(next http.Handler) http.Handler {
 					http.StatusInternalServerError,
 					response,
 				); err != nil {
-					app.logger.Printf("Error encoding internal server error response: %v", err)
+					app.logger.Printf(
+						"error encoding panic response: %v",
+						err,
+					)
 				}
 			}
-
 		}()
 
 		next.ServeHTTP(w, r)
@@ -140,7 +139,6 @@ func writeJSON(w http.ResponseWriter, status int, data any) error {
 }
 
 func (recorder *responseRecorder) WriteHeader(statusCode int) {
-
 	if recorder.statusCode != 0 {
 		return
 	}
@@ -151,7 +149,7 @@ func (recorder *responseRecorder) WriteHeader(statusCode int) {
 
 func (recorder *responseRecorder) Write(data []byte) (int, error) {
 	if recorder.statusCode == 0 {
-		recorder.statusCode = http.StatusOK
+		recorder.WriteHeader(http.StatusOK)
 	}
 
 	return recorder.ResponseWriter.Write(data)
