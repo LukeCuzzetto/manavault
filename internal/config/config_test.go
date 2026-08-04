@@ -2,8 +2,11 @@ package config
 
 import "testing"
 
+const testDatabaseURL = "postgres://deckengine:test@localhost:5432/deckengine"
+
 func TestLoadUsesDefaultPort(t *testing.T) {
 	t.Setenv("PORT", "")
+	t.Setenv("DATABASE_URL", testDatabaseURL)
 
 	cfg, err := Load()
 	if err != nil {
@@ -18,6 +21,7 @@ func TestLoadUsesDefaultPort(t *testing.T) {
 func TestLoadUsesEnvironmentPort(t *testing.T) {
 
 	t.Setenv("PORT", "9090")
+	t.Setenv("DATABASE_URL", testDatabaseURL)
 
 	cfg, err := Load()
 	if err != nil {
@@ -32,6 +36,7 @@ func TestLoadUsesEnvironmentPort(t *testing.T) {
 
 func TestLoadRejectsNonNumericalPort(t *testing.T) {
 	t.Setenv("PORT", "banana")
+	t.Setenv("DATABASE_URL", testDatabaseURL)
 
 	_, err := Load()
 	if err == nil {
@@ -41,6 +46,17 @@ func TestLoadRejectsNonNumericalPort(t *testing.T) {
 
 func TestLoadRejectsOutOfRangePort(t *testing.T) {
 	t.Setenv("PORT", "70000")
+	t.Setenv("DATABASE_URL", testDatabaseURL)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestLoadRejectsMissingDatabaseURL(t *testing.T) {
+	t.Setenv("PORT", "8080")
+	t.Setenv("DATABASE_URL", "")
 
 	_, err := Load()
 	if err == nil {

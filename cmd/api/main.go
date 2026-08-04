@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -12,9 +13,12 @@ import (
 
 	"github.com/LukeCuzzetto/deckengine/internal/api"
 	"github.com/LukeCuzzetto/deckengine/internal/config"
+	"github.com/LukeCuzzetto/deckengine/internal/database"
 )
 
 const (
+	databaseConnectionTimeout = 5 * time.Second
+
 	serverReadHeaderTimeout = 5 * time.Second
 	serverReadTimeout       = 10 * time.Second
 	serverWriteTimeout      = 30 * time.Second
@@ -40,11 +44,33 @@ func main() {
 
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 
-	cfg, err := config.Load()
-
-	if err != nil {
-		log.Fatalf("error loading config: %v", err)
+	if err := run(logger); err != nil {
+		logger.Printf("Application error: %v", err)
+		os.Exit(1)
 	}
+}
+
+func run(logger *log.Logger) error {
+
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	databaseContext, cancelDatabase := context.WithTimeout(context.Background(), databaseConnectionTimeout)
+	defer cancelDatabase()
+
+	databasePool, err := database.Open(databaseContext, cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+
+	defer func() {
+		databasePool.Close()
+		logger.Println("Database connection pool closed")
+	}()
+
+	logger.Printf("Database connection pool established")
 
 	app := api.NewApplication(logger)
 	router := app.Router()
@@ -56,7 +82,6 @@ func main() {
 		os.Interrupt,
 		syscall.SIGTERM,
 	)
-
 	defer stop()
 
 	serverErrors := make(chan error, 1)
@@ -65,29 +90,25 @@ func main() {
 		serverErrors <- server.ListenAndServe()
 	}()
 
-	logger.Printf("DECK//ENGINE API is listening on %s", cfg.Address)
+	logger.Printf("DECK//ENGINE API Listening on %s", cfg.Address)
 
 	select {
 	case err := <-serverErrors:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Fatalf("error running server: %v", err)
+			return fmt.Errorf("run server: %w", err)
 		}
-
-		return
+		return nil
 
 	case <-shutdownSignal.Done():
-		logger.Println("shutdown signal received, shutting down server...")
+		logger.Println("Shutdown signal received")
 	}
-
-	shutdownContext, cancel := context.WithTimeout(
-		context.Background(),
-		serverShutdownTimeout,
-	)
-	defer cancel()
+	shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), serverShutdownTimeout)
+	defer cancelShutdown()
 
 	if err := server.Shutdown(shutdownContext); err != nil {
-		logger.Printf("graceful shut down failed: %v", err)
-	} else {
-		logger.Println("DECK//ENGINE API Stopped")
+		return fmt.Errorf("graceful shutdown: %w", err)
 	}
+	logger.Println("DECK//ENGINE API stopped gracefully")
+
+	return nil
 }

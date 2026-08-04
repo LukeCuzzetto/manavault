@@ -9,7 +9,8 @@ import (
 const defaultPort = "8080"
 
 type Config struct {
-	Address string
+	Address     string
+	DatabaseURL string
 }
 
 func Load() (Config, error) {
@@ -35,7 +36,14 @@ func Load() (Config, error) {
 		)
 	}
 
+	databaseURL := os.Getenv("DATABASE_URL")
+
+	if databaseURL == "" {
+		return Config{}, fmt.Errorf("DATABASE_URL environment variable is required")
+	}
+
 	return Config{
-		Address: fmt.Sprintf(":%d", port),
+		Address:     fmt.Sprintf(":%d", port),
+		DatabaseURL: databaseURL,
 	}, nil
 }
