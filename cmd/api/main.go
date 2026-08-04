@@ -64,7 +64,6 @@ func run(logger *log.Logger) error {
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
-
 	defer func() {
 		databasePool.Close()
 		logger.Println("Database connection pool closed")
@@ -72,7 +71,7 @@ func run(logger *log.Logger) error {
 
 	logger.Printf("Database connection pool established")
 
-	app := api.NewApplication(logger)
+	app := api.NewApplication(logger, databasePool)
 	router := app.Router()
 
 	server := newHTTPServer(cfg.Address, router)

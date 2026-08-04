@@ -2,7 +2,9 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -11,10 +13,18 @@ import (
 	"testing"
 )
 
+type stubDatabase struct {
+	pingError error
+}
+
+func (database *stubDatabase) Ping(ctx context.Context) error {
+	return database.pingError
+}
+
 func newTestRouter() http.Handler {
 	logger := log.New(io.Discard, "", 0)
 
-	app := NewApplication(logger)
+	app := NewApplication(logger, &stubDatabase{})
 
 	return app.Router()
 }
@@ -137,7 +147,7 @@ func TestRequestLoggerLogsCompletedRequest(t *testing.T) {
 
 	logger := log.New(&logOutput, "", 0)
 
-	app := NewApplication(logger)
+	app := NewApplication(logger, &stubDatabase{})
 	router := app.Router()
 
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)
@@ -161,7 +171,7 @@ func TestRecoverPanicReturnsInternalServerError(t *testing.T) {
 
 	logger := log.New(&logOutput, "", 0)
 
-	app := NewApplication(logger)
+	app := NewApplication(logger, &stubDatabase{})
 
 	panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("unexpected test failure")
@@ -223,5 +233,67 @@ func TestRecoverPanicReturnsInternalServerError(t *testing.T) {
 			"expected log output to contain status=500, got %q",
 			logOutput.String(),
 		)
+	}
+}
+
+func TestReadinessEndpointReturnsOK(t *testing.T) {
+	logger := log.New(io.Discard, "", 0)
+
+	app := NewApplication(logger, &stubDatabase{})
+
+	request := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	response := httptest.NewRecorder()
+
+	app.Router().ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusOK,
+			response.Code,
+		)
+	}
+
+	var body readinessResponse
+
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode response body: %v", err)
+	}
+
+	if body.Status != "ready" {
+		t.Errorf("expected database status %q, got %q", "ready", body.Status)
+	}
+
+	if body.Database != "ok" {
+		t.Errorf("expected status %q, got %q", "ok", body.Database)
+	}
+}
+
+func TestReadinessEndpointReturnsServiceUnavailable(t *testing.T) {
+	logger := log.New(io.Discard, "", 0)
+
+	app := NewApplication(logger, &stubDatabase{pingError: errors.New("database connection failed")})
+
+	request := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	response := httptest.NewRecorder()
+
+	app.Router().ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusServiceUnavailable,
+			response.Code,
+		)
+	}
+
+	var body errorResponse
+
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode response body: %v", err)
+	}
+
+	if body.Error != "service unavailable" {
+		t.Errorf("expected error %q, got %q", "service unavailable", body.Error)
 	}
 }

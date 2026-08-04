@@ -1,14 +1,18 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"time"
 )
 
+const databaseReadinessTimeout = 2 * time.Second
+
 type Application struct {
-	logger *log.Logger
+	logger   *log.Logger
+	database Database
 }
 
 type responseRecorder struct {
@@ -23,9 +27,15 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
-func NewApplication(logger *log.Logger) *Application {
+type readinessResponse struct {
+	Status   string `json:"status"`
+	Database string `json:"database"`
+}
+
+func NewApplication(logger *log.Logger, database Database) *Application {
 	return &Application{
-		logger: logger,
+		logger:   logger,
+		database: database,
 	}
 }
 
@@ -33,6 +43,7 @@ func (app *Application) Router() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", app.healthHandler)
+	mux.HandleFunc("/ready", app.readinessHandler)
 	mux.HandleFunc("/", app.notFoundHandler)
 
 	return app.requestLogger(app.recoverPanic(mux))
@@ -153,4 +164,57 @@ func (recorder *responseRecorder) Write(data []byte) (int, error) {
 	}
 
 	return recorder.ResponseWriter.Write(data)
+}
+
+func (app *Application) readinessHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+
+		response := errorResponse{
+			Error: "method not allowed",
+		}
+
+		if err := writeJSON(
+			w,
+			http.StatusMethodNotAllowed,
+			response,
+		); err != nil {
+			app.logger.Printf("Error encoding method not allowed response: %v", err)
+		}
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), databaseReadinessTimeout)
+	defer cancel()
+
+	if err := app.database.Ping(ctx); err != nil {
+		app.logger.Printf("Database readiness check failed: %v", err)
+
+		response := errorResponse{
+			Error: "service unavailable",
+		}
+
+		if err := writeJSON(
+			w,
+			http.StatusServiceUnavailable,
+			response,
+		); err != nil {
+			app.logger.Printf("Error encoding readiness error response: %v", err)
+		}
+		return
+
+	}
+
+	response := readinessResponse{
+		Status:   "ready",
+		Database: "ok",
+	}
+
+	if err := writeJSON(
+		w,
+		http.StatusOK,
+		response,
+	); err != nil {
+		app.logger.Printf("Error encoding readiness response: %v", err)
+	}
 }
