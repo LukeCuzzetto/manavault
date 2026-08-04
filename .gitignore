@@ -1,0 +1,13 @@
+# Environment variables and secrets
+.env
+.env.*
+
+# Compiled binaries
+bin/
+deckengine
+
+# Test and coverage output
+coverage.out
+
+# Local editor files
+.vscode/

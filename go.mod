@@ -1,3 +1,3 @@
-module github.com/LukeCuzzetto/manavault
+module github.com/LukeCuzzetto/deckengine
 
 go 1.26.5

@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/LukeCuzzetto/manavault/internal/api"
-	"github.com/LukeCuzzetto/manavault/internal/config"
+	"github.com/LukeCuzzetto/deckengine/internal/api"
+	"github.com/LukeCuzzetto/deckengine/internal/config"
 )
 
 const (
@@ -56,6 +56,7 @@ func main() {
 		os.Interrupt,
 		syscall.SIGTERM,
 	)
+
 	defer stop()
 
 	serverErrors := make(chan error, 1)
@@ -64,7 +65,7 @@ func main() {
 		serverErrors <- server.ListenAndServe()
 	}()
 
-	logger.Printf("server is listening on %s", cfg.Address)
+	logger.Printf("DECK//ENGINE API is listening on %s", cfg.Address)
 
 	select {
 	case err := <-serverErrors:
@@ -87,6 +88,6 @@ func main() {
 	if err := server.Shutdown(shutdownContext); err != nil {
 		logger.Printf("graceful shut down failed: %v", err)
 	} else {
-		logger.Println("ManaVault API Stopped")
+		logger.Println("DECK//ENGINE API Stopped")
 	}
 }
